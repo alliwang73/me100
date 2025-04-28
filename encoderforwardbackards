@@ -1,0 +1,106 @@
+from board import LED
+from machine import Pin, PWM, Timer
+from time import sleep
+import math
+
+#led = Pin(LED, mode=Pin.OUT)
+led_ext = Pin(15, mode=Pin.OUT)
+CH_A = Pin(14, mode=Pin.IN)
+CH_B = Pin(21, mode=Pin.IN)
+
+L1 = PWM(16, freq=2000, duty=0, timer=0)
+L2 = PWM(17, freq=2000, duty=0, timer=1)
+
+
+count=[]
+count_prev=[]
+enc_code=[]
+
+
+print('Starting')
+
+
+for k in range(1000):
+	count.append(0)
+	count_prev.append(0)
+	enc_code.append(0)
+
+Enc_value_prev = (CH_A.value()<<1)|CH_B.value()
+display = 1
+cycle = 0
+Dir=0
+while (1):
+	Dir ^= 1
+	if Dir == 1:
+		L1.duty(50)
+		L2.duty(0)
+	else:
+		L1.duty(0)
+		L2.duty(50)
+	for k in range(1000):
+		led_ext(1)
+		Enc_value = (CH_A.value()<<1)|CH_B.value()
+		enc_code[k]=Enc_value
+		if Enc_value == 2:
+			if Enc_value_prev == 2:
+				count_inc = 0
+			else:
+				if Enc_value_prev == 0:
+					count_inc = 1
+				else:
+					if Enc_value_prev == 3:
+						count_inc = -1
+		else:
+			if Enc_value == 3:
+				if Enc_value_prev == 3:
+					count_inc = 0
+				else:
+					if Enc_value_prev == 2:
+						count_inc = 1
+					else:
+						if Enc_value_prev == 1:
+							count_inc = -1
+			else:
+				if Enc_value == 1:
+					if Enc_value_prev == 1:
+						count_inc = 0
+					else:
+						if Enc_value_prev == 3:
+							count_inc = 1
+						else:
+							if Enc_value_prev == 0:
+								count_inc = -1
+				else:
+					if Enc_value == 0:
+						if Enc_value_prev == 0:
+							count_inc = 0
+						else:
+							if Enc_value_prev == 1:
+									count_inc = 1
+							else:
+								if Enc_value_prev == 2:
+									count_inc = -1
+		Enc_value_prev = Enc_value
+		count_prev[k] = (count[k-1])
+		count[k] = (count_prev[k] + count_inc)
+		led_ext(0)
+		
+	#print(count)
+	L1.duty(0)
+	L2.duty(0)
+
+	if display == 1:
+		cycle = cycle + 1
+		for k in range(1000):
+			print(enc_code[k],count[k])
+			if cycle == 2:
+				display = 0
+#t1 = Timer(1)
+#t1.init(period=10, mode=t1.PERIODIC, callback=tcb)
+
+#while 1:
+#	print(brightness)
+#	time.sleep(0.1)
+
+#led_ext = Pin(LED, mode=Pin.OUT)
+
