@@ -67,7 +67,6 @@ def status(request):                                    # Define route for statu
         timestamp=elapsed
     ), 200, {'Content-Type': 'text/html'}               # Render HTML with current status
 
-#Set up MQTT callback, which takes the most recent data from the feed and parses it as an integer
 target_number = None                                   # Placeholder for target number
 received_number = None                                 # Placeholder for received number
 
@@ -109,7 +108,6 @@ ENCODER_B_PIN.irq(trigger=machine.Pin.IRQ_RISING | machine.Pin.IRQ_FALLING, hand
 def move_to_angle(degrees):                            # Move motor to specified angle
     global target_position
     global pulses_needed
-    #pulses_needed = int(degrees)
     pulses_needed = int((degrees / 360) * ENCODER_RESOLUTION)   # Convert degrees to encoder pulses
     print(encoder_position)
     target_position = encoder_position + pulses_needed           # Set target position
