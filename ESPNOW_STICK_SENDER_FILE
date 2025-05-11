@@ -1,0 +1,79 @@
+import network, espnow
+from machine import I2C, Pin, ADC
+from lsm6dso import LSM6DSO
+import time, math
+
+# ─── Wi-Fi Setup ───
+sta = network.WLAN(network.STA_IF)
+sta.active(True)
+sta.disconnect()
+sta.config(channel=4)  # Must match receiver
+print("Wi-Fi set to channel 4 (for ESP-NOW)")
+
+# ─── ESP-NOW Setup ───
+e = espnow.ESPNow()
+e.active(True)
+peer1 = b'\x14\x2b\x2f\xae\xe4\x08'  # force receiver
+peer2 = b'\x14\x2b\x2f\xae\xbf\xb0'  # peak receiver
+e.add_peer(peer1)
+e.add_peer(peer2)
+
+# ─── Sensor Setup ───
+i2c = I2C(0, scl=Pin(22), sda=Pin(21))
+sensor = LSM6DSO(i2c, addr=0x6B)
+
+force_sensor = ADC(Pin(34))
+force_sensor.atten(ADC.ATTN_11DB)
+force_sensor.width(ADC.WIDTH_10BIT)
+
+# ─── Calibration ───
+print("Calibrating... Hold drumstick level.")
+time.sleep(2)
+ax0, ay0, az0 = sensor.read_accel()
+initial_pitch = math.degrees(math.atan2(-ax0, math.sqrt(ay0**2 + az0**2)))
+IMU_POSITION_FROM_TIP_M = 0.2032 #8 inches
+
+# ─── Peak Detection ───
+prev_pitch = None
+prev_prev_pitch = None
+peak_detected = False
+degree_sep = 2
+
+# ─── Main Loop ───
+while True:
+    ax, ay, az = sensor.read_accel()
+    pitch = math.degrees(math.atan2(-ax, math.sqrt(ay**2 + az**2)))
+    rel_pitch = -(pitch - initial_pitch)
+    relative_pitch_rad = math.radians(-(pitch - initial_pitch))
+    height = IMU_POSITION_FROM_TIP_M * math.sin(relative_pitch_rad)
+
+    if prev_prev_pitch is not None and prev_pitch is not None:
+        if (prev_pitch - prev_prev_pitch) >= degree_sep and (prev_pitch - rel_pitch) >= degree_sep:
+            peak_detected = True
+            if peak_detected == True:
+                msg2 = f"{prev_pitch:.2f}".encode()
+                try:
+                    e.send(peer2, msg2)
+                    #print(msg2)
+                    #time.sleep(0.5)
+                except OSError:
+                    print("ESP-NOW peak send failed")
+
+    if prev_pitch is not None and rel_pitch < prev_pitch:
+        peak_detected = False
+
+    prev_prev_pitch = prev_pitch
+    prev_pitch = rel_pitch
+
+    force = force_sensor.read()
+    msg1 = f"{force}".encode()
+    if force > 0:
+        try:
+            e.send(peer1, msg1)
+        except OSError:
+            print("ESP-NOW force send failed")
+
+    #print(f"Height: {height * 39.3701:.2f} in")
+    print(f"{force}")
+    time.sleep(0.02)
+   
